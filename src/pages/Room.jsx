@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
-import client, {
-  databases,
-  DATABASE_ID,
-  COLLECTION_ID_MESSAGES,
-} from '../appwriteConfig';
+import client, { databases, DATABASE_ID, COLLECTION_ID_MESSAGES } from '../appwriteConfig';
 import { ID, Query, Permission, Role } from 'appwrite';
 import Header from '../components/Header';
 import { useAuth } from '../utils/hooks/authHook';
@@ -20,26 +16,18 @@ const Room = () => {
     const unsubscribe = client.subscribe(
       `databases.${DATABASE_ID}.collections.${COLLECTION_ID_MESSAGES}.documents`,
       (response) => {
-        if (
-          response.events.includes(
-            'databases.*.collections.*.documents.*.create',
-          )
-        ) {
+        if (response.events.includes('databases.*.collections.*.documents.*.create')) {
           setMessages((prevState) => [response.payload, ...prevState]);
           console.log('Message created');
         }
 
-        if (
-          response.events.includes(
-            'databases.*.collections.*.documents.*.delete',
-          )
-        ) {
+        if (response.events.includes('databases.*.collections.*.documents.*.delete')) {
           setMessages((prevState) =>
-            prevState.filter((message) => message.$id !== response.payload.$id),
+            prevState.filter((message) => message.$id !== response.payload.$id)
           );
           console.log('Message deleted');
         }
-      },
+      }
     );
 
     return () => {
@@ -48,18 +36,27 @@ const Room = () => {
   }, []);
 
   const getMessages = async () => {
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      COLLECTION_ID_MESSAGES,
-      [Query.orderDesc('$createdAt')],
-    );
-    setMessages(response.documents);
+    try {
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        COLLECTION_ID_MESSAGES,
+        [Query.orderDesc('$createdAt')]
+      );
+      setMessages(response.documents);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const permissions = [Permission.write(Role.user(user.$id))];
+    if (!user) {
+      alert("You must be logged in to send messages.");
+      return;
+    }
+
+    const permissions = [Permission.read(Role.any()), Permission.write(Role.user(user.$id))];
 
     const payload = {
       userid: user.$id,
@@ -67,18 +64,28 @@ const Room = () => {
       body: messageBody,
     };
 
-    await databases.createDocument(
-      DATABASE_ID,
-      COLLECTION_ID_MESSAGES,
-      ID.unique(),
-      payload,
-      permissions,
-    );
-    setMessageBody('');
+    try {
+      await databases.createDocument(
+        DATABASE_ID,
+        COLLECTION_ID_MESSAGES,
+        ID.unique(),
+        payload,
+        permissions
+      );
+      setMessageBody('');
+    } catch (error) {
+      console.error("Error creating document:", error);
+      alert(error.message);
+    }
   };
 
   const deleteMessage = async (id) => {
-    await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_MESSAGES, id);
+    try {
+      await databases.deleteDocument(DATABASE_ID, COLLECTION_ID_MESSAGES, id);
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      alert(error.message);
+    }
   };
 
   return (
@@ -91,9 +98,7 @@ const Room = () => {
               required
               maxLength="10000"
               placeholder="Type something..."
-              onChange={(e) => {
-                setMessageBody(e.target.value);
-              }}
+              onChange={(e) => setMessageBody(e.target.value)}
               value={messageBody}
             ></textarea>
           </div>
@@ -108,11 +113,7 @@ const Room = () => {
             <div key={message.$id} className={'message--wrapper'}>
               <div className="message--header">
                 <p>
-                  {message?.username ? (
-                    <span> {message?.username}</span>
-                  ) : (
-                    'Anonymous user'
-                  )}
+                  {message?.username ? <span> {message?.username}</span> : 'Anonymous user'}
 
                   <small className="message-timestamp">
                     {' '}
@@ -129,24 +130,12 @@ const Room = () => {
                   </small>
                 </p>
 
-                {message.$permissions.includes(
-                  `delete("user:${user.$id}")`,
-                ) && (
-                  <Trash2
-                    className="delete--btn"
-                    onClick={() => {
-                      deleteMessage(message.$id);
-                    }}
-                  />
+                {message.$permissions.includes(`delete("user:${user?.$id}")`) && (
+                  <Trash2 className="delete--btn" onClick={() => deleteMessage(message.$id)} />
                 )}
               </div>
 
-              <div
-                className={
-                  'message--body' +
-                  (message.userid === user.$id ? ' message--body--owner' : '')
-                }
-              >
+              <div className={'message--body' + (message.userid === user?.$id ? ' message--body--owner' : '')}>
                 <span>{message.body}</span>
               </div>
             </div>

@@ -8,7 +8,8 @@ const PrivateRoutes = () => {
     return <Navigate to="/login" />;
   }
 
-  if (user && !user.emailVerification) {
+  // Ensure we check explicitly for `false`
+  if (user.emailVerification === false) {
     return <Navigate to="/verify" />;
   }
 

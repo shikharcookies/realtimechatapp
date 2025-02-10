@@ -5,10 +5,12 @@ import { useNavigate } from 'react-router';
 import { ID } from 'appwrite';
 
 const AuthContext = createContext();
+
 export const AuthProvider = ({ children }) => {
   AuthProvider.propTypes = {
     children: PropTypes.node.isRequired,
   };
+
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
@@ -19,29 +21,32 @@ export const AuthProvider = ({ children }) => {
 
   const getUserOnLoad = async () => {
     try {
-      let accountDetails = await account.get();
+      const accountDetails = await account.get();
       setUser(accountDetails);
-    } catch {
-      console.log('No user found');
+    } catch (error) {
+      console.error("Error fetching user session:", error);
+      setUser(null);
     }
     setLoading(false);
   };
 
   const fetchUser = async () => {
     try {
-      let accountDetails = await account.get();
+      const accountDetails = await account.get();
       setUser(accountDetails);
     } catch (error) {
       alert(error.message);
+      setUser(null);
     }
   };
+
   const handleUserLogin = async (e, credentials) => {
     e.preventDefault();
 
     try {
       await account.createEmailPasswordSession(
         credentials.email,
-        credentials.password,
+        credentials.password
       );
       await fetchUser();
       navigate('/');
@@ -51,20 +56,24 @@ export const AuthProvider = ({ children }) => {
   };
 
   const handleLogout = async () => {
-    await account.deleteSession('current');
-    setUser(null);
+    try {
+      await account.deleteSession('current');
+      setUser(null);
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
   };
+
   const handleVerification = async () => {
     try {
       await account.createVerification(`${window.location.origin}/verify`);
       alert('Verification email sent!');
     } catch (error) {
-      alert(
-        'You have reached the limit for verification emails. Please try again later.',
-      );
-      console.log(error);
+      console.error("Verification error:", error);
+      alert('You have reached the limit for verification emails. Please try again later.');
     }
   };
+
   const handleRegister = async (e, credentials) => {
     e.preventDefault();
 
@@ -78,13 +87,10 @@ export const AuthProvider = ({ children }) => {
         ID.unique(),
         credentials.email,
         credentials.password1,
-        credentials.name,
+        credentials.name
       );
 
-      await account.createEmailPasswordSession(
-        credentials.email,
-        credentials.password1,
-      );
+      await account.createEmailPasswordSession(credentials.email, credentials.password1);
       await fetchUser();
       await handleVerification();
       navigate('/');
@@ -108,4 +114,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
 export default AuthContext;
